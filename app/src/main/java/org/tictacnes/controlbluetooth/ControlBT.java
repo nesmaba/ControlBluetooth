@@ -15,6 +15,7 @@ public class ControlBT extends AppCompatActivity {
     // VOY POR CONEXION CLIENTE BT https://developer.android.com/guide/topics/connectivity/bluetooth.html?hl=es-419
     public static final java.util.UUID MY_UUID
             = java.util.UUID.fromString("DEADBEEF-0000-0000-0000-000000000000"); // The String is in a format according to RFC 4122. Para Arduino
+    private AcceptThread acceptThread;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -29,7 +30,12 @@ public class ControlBT extends AppCompatActivity {
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
          */
+        this.acceptThread = new AcceptThread();
+        this.acceptThread.start(); // Automáticamente llamará a run()
+
     }
+
+
 
     @RequiresApi(api = Build.VERSION_CODES.O)
     @Override
@@ -39,6 +45,7 @@ public class ControlBT extends AppCompatActivity {
             getFragmentManager().beginTransaction().replace(R.id.fragment_container,
                     new ControlBluetoothFragment(), "PRINCIPAL").commit();
         }else{
+            this.acceptThread.cancel();
             finish();
         }
     }
@@ -52,7 +59,7 @@ public class ControlBT extends AppCompatActivity {
             BluetoothServerSocket tmp = null;
             try {
                 // MY_UUID is the app's UUID string, also used by the client code
-                tmp = ControlBluetoothFragment.getmBluetoothAdapter().listenUsingRfcommWithServiceRecord("controlBT", MY_UUID);
+                tmp = BTdevicesFragment.getmBluetoothAdapter().listenUsingRfcommWithServiceRecord("controlBT", MY_UUID);
             } catch (IOException e) {
                 Log.e("serverBT", e.toString());
             }
