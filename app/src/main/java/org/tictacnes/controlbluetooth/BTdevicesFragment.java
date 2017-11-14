@@ -149,8 +149,23 @@ public class BTdevicesFragment extends Fragment {
             ((BTdeviceRecyclerViewAdapter) (recyclerView.getAdapter())).setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
-                    TextView tv = (TextView) view.findViewById(R.id.tvNameBT);
-                    System.out.println(tv.getText());
+                    TextView tvName = (TextView) view.findViewById(R.id.tvNameBT);
+                    TextView tvAddress = (TextView) view.findViewById(R.id.tvAddressBT);
+                    System.out.println(tvAddress.getText());
+                    BluetoothDevice btPulsado = btDeviceRecyclerViewAdapter.getBluetootDeviceList(tvAddress.getText().toString());
+                    if(btPulsado!=null){
+                        // CONECTARSE A ESTE DISPOSITIVO
+                        try {
+                            // Iniciamos conexión BT como clientes con el dispositivo seleccionado
+                            BluetoothSocket btSocketCliente=btPulsado.createInsecureRfcommSocketToServiceRecord(MY_UUID);
+                            ConnectedThread connectedThread = new ConnectedThread(btSocketCliente);
+                            connectedThread.start();
+
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                    // ConnectedThread connectedThread = new ConnectedThread();
                 }
             });
         }

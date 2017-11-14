@@ -57,6 +57,17 @@ public class BTdeviceRecyclerViewAdapter extends RecyclerView.Adapter<BTdeviceRe
         this.listener = listener;
     }
 
+    public BluetoothDevice getBluetootDeviceList(String mac){
+        int i=0;
+        while(!mac.equals(this.mValues.get(i).getAddress()) && i<this.mValues.size()){
+            i++;
+        }
+        if(i>=this.mValues.size())
+            return null;
+        else
+            return this.mValues.get(i);
+    }
+
     @Override
     public void onClick(View view) {
         if(listener != null)
