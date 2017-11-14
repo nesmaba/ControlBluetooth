@@ -4,6 +4,7 @@ import android.Manifest;
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothServerSocket;
 import android.bluetooth.BluetoothSocket;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -16,6 +17,7 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -38,9 +40,12 @@ public class BTdevicesFragment extends Fragment {
 
     // MIRAR Para el listener http://www.sgoliver.net/blog/controles-de-seleccion-v-recyclerview/
 
-    // TODO: Customize parameter argument names
+    // FUENTE BT https://developer.android.com/guide/topics/connectivity/bluetooth.html?hl=es-419
+    // Voy por enviar comandos mediante write
+
+    public AcceptThread acceptThread;
+
     private static final String ARG_COLUMN_COUNT = "column-count";
-    // TODO: Customize parameters
     private OnListFragmentInteractionListener mListener;
     private RecyclerView recyclerView;
     public static final java.util.UUID MY_UUID
@@ -80,7 +85,6 @@ public class BTdevicesFragment extends Fragment {
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
             // When discovery finds a device
-            System.out.println("Hola");
             if (BluetoothDevice.ACTION_FOUND.equals(action)) {
                 // Get the BluetoothDevice object from the Intent
                 BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
@@ -136,6 +140,9 @@ public class BTdevicesFragment extends Fragment {
                 new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},
                 MY_PERMISSIONS_REQUEST_ACCESS_COARSE_LOCATION);
 
+        habilitarBT();
+        consultaSincronizados();
+
         // Set the adapter
         if (view instanceof RecyclerView) {
             Context context = view.getContext();
@@ -145,19 +152,22 @@ public class BTdevicesFragment extends Fragment {
             } else {
                 recyclerView.setLayoutManager(new GridLayoutManager(context, mColumnCount));
             }
+
             recyclerView.setAdapter(getBTdeviceRecyclerViewAdapter());
+            System.out.println(getBTdeviceRecyclerViewAdapter());
             ((BTdeviceRecyclerViewAdapter) (recyclerView.getAdapter())).setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
                     TextView tvName = (TextView) view.findViewById(R.id.tvNameBT);
                     TextView tvAddress = (TextView) view.findViewById(R.id.tvAddressBT);
-                    System.out.println(tvAddress.getText());
+
                     BluetoothDevice btPulsado = btDeviceRecyclerViewAdapter.getBluetootDeviceList(tvAddress.getText().toString());
                     if(btPulsado!=null){
                         // CONECTARSE A ESTE DISPOSITIVO
                         try {
                             // Iniciamos conexión BT como clientes con el dispositivo seleccionado
                             BluetoothSocket btSocketCliente=btPulsado.createInsecureRfcommSocketToServiceRecord(MY_UUID);
+                            System.out.println("socketCliente: "+btSocketCliente);
                             ConnectedThread connectedThread = new ConnectedThread(btSocketCliente);
                             connectedThread.start();
 
@@ -169,12 +179,13 @@ public class BTdevicesFragment extends Fragment {
                 }
             });
         }
-        habilitarBT();
-        consultaSincronizados();
 
         mBluetoothAdapter.startDiscovery();
         // una vez encontrado un dispositivo usar CANCELDISCOVERY() OBLIGADO)
         buscaDispositivosBT();
+
+        this.acceptThread = new AcceptThread();
+        this.acceptThread.start(); // Automáticamente llamará a run()
 
         return view;
     }
@@ -226,7 +237,7 @@ public class BTdevicesFragment extends Fragment {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        // getActivity().unregisterReceiver(mReceiver);
+        getActivity().unregisterReceiver(mReceiver);
     }
 
     @Override
@@ -361,11 +372,17 @@ public class BTdevicesFragment extends Fragment {
         public void run() {
             byte[] buffer = new byte[1024];  // buffer store for the stream
             int bytes; // bytes returned from read()
+            try {
+                mmSocket.connect(); // MUY IMPORTANTE, SINO NO FUNCIONA
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
 
             // Keep listening to the InputStream until an exception occurs
             while (true) {
                 try {
                     // Read from the InputStream
+                    System.out.println("run: "+mmInStream);
                     bytes = mmInStream.read(buffer);
                     // Send the obtained bytes to the UI activity
                     mHandler.obtainMessage(MESSAGE_READ, bytes, -1, buffer)
@@ -391,4 +408,52 @@ public class BTdevicesFragment extends Fragment {
         }
     }
 
+    private class AcceptThread extends Thread {
+        private final BluetoothServerSocket mmServerSocket;
+
+        public AcceptThread() {
+            // Use a temporary object that is later assigned to mmServerSocket,
+            // because mmServerSocket is final
+            BluetoothServerSocket tmp = null;
+            try {
+                // MY_UUID is the app's UUID string, also used by the client code
+                tmp = BTdevicesFragment.getmBluetoothAdapter().listenUsingRfcommWithServiceRecord("controlBT", MY_UUID);
+            } catch (IOException e) {
+                Log.e("serverBT", e.toString());
+            }
+            mmServerSocket = tmp;
+        }
+
+        public void run() {
+            BluetoothSocket socket = null;
+            // Keep listening until exception occurs or a socket is returned
+            while (true) {
+                try {
+                    socket = mmServerSocket.accept();
+                } catch (IOException e) {
+                    break;
+                }
+                // If a connection was accepted
+                if (socket != null) {
+                    // Do work to manage the connection (in a separate thread)
+                    // manageConnectedSocket(socket);
+                    try {
+                        mmServerSocket.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    break;
+                }
+            }
+        }
+
+        /** Will cancel the listening socket, and cause the thread to finish */
+        public void cancel() {
+            try {
+                mmServerSocket.close();
+            } catch (IOException e) {
+                Log.e("serverBT", e.toString());
+            }
+        }
+    }
 }
